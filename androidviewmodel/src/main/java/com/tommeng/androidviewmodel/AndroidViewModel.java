@@ -4,12 +4,16 @@ import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import rx.Subscription;
+import rx.functions.Action1;
+import rx.subjects.PublishSubject;
+
 public abstract class AndroidViewModel implements Parcelable {
     private Context context;
-
-    private OnPropertyChangeListener changeListener;
+    private PublishSubject<ViewModelProperty> propertyChangeSubject;
 
     public AndroidViewModel() {
+        propertyChangeSubject = PublishSubject.create();
     }
 
     public AndroidViewModel(Parcel in) {
@@ -25,14 +29,13 @@ public abstract class AndroidViewModel implements Parcelable {
         return 0;
     }
 
-    /**
-     * Raise changes in all properties.
-     */
-    public void notifyFullUpdate() {
-    }
+    public abstract ViewModelProperty[] getViewModelProperties();
 
-    public void setChangeListener(OnPropertyChangeListener listener) {
-        changeListener = listener;
+    public void notifySetChanged() {
+        ViewModelProperty[] viewModelProperties = getViewModelProperties();
+        for (ViewModelProperty viewModelProperty : viewModelProperties) {
+            raisePropertyChanged(viewModelProperty);
+        }
     }
 
     public Context getContext() {
@@ -43,18 +46,30 @@ public abstract class AndroidViewModel implements Parcelable {
         this.context = context;
     }
 
-    /**
-     * Raise a change in a property.
-     *
-     * @param property
-     */
-    protected void raisePropertyChanged(String property) {
-        if (changeListener != null) {
-            changeListener.onPropertyChanged(property);
-        }
+    public Subscription bind(Action1<ViewModelProperty> action1) {
+        return propertyChangeSubject.subscribe(action1);
     }
 
-    public interface OnPropertyChangeListener {
-        void onPropertyChanged(String property);
+    public void raisePropertyChanged(ViewModelProperty viewModelProperty) {
+        propertyChangeSubject.onNext(viewModelProperty);
+    }
+
+    public static class ViewModelProperty<T> {
+        public T value;
+
+        public ViewModelProperty() {
+        }
+
+        public ViewModelProperty(T value) {
+            this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ViewModelProperty<?> that = (ViewModelProperty<?>) o;
+            return hashCode() == that.hashCode();
+        }
     }
 }
